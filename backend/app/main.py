@@ -25,6 +25,32 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Failed to initialize database tables: {e}")
 
+    # Startup: Seed demo user if not exists
+    try:
+        from sqlalchemy import select
+        from app.db.database import async_session_factory
+        from app.db.models import User
+        from app.services.auth_service import hash_password
+        
+        async with async_session_factory() as session:
+            stmt = select(User).where(User.email == "demo@coach.com")
+            result = await session.execute(stmt)
+            if not result.scalar_one_or_none():
+                demo_user = User(
+                    email="demo@coach.com",
+                    username="demo_user",
+                    password_hash=hash_password("demopass123"),
+                    display_name="Demo Candidate",
+                    current_rating=1200
+                )
+                session.add(demo_user)
+                await session.commit()
+                print("Demo user seeded successfully (demo@coach.com / demopass123).")
+            else:
+                print("Demo user already exists.")
+    except Exception as e:
+        print(f"Failed to seed demo user: {e}")
+
     # Startup: Initialize Qdrant collection
     try:
         if settings.qdrant_api_key:

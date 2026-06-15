@@ -10,6 +10,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [showWakeupNotice, setShowWakeupNotice] = useState(false);
   
   const { login, user, authLoading, authError } = useStore();
   const router = useRouter();
@@ -28,6 +29,19 @@ export default function LoginPage() {
     }
   }, [authError]);
 
+  // Alert timer for Render cold starts
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (authLoading) {
+      timer = setTimeout(() => {
+        setShowWakeupNotice(true);
+      }, 3000);
+    } else {
+      setShowWakeupNotice(false);
+    }
+    return () => clearTimeout(timer);
+  }, [authLoading]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -39,7 +53,6 @@ export default function LoginPage() {
       await login(email, password);
       router.push('/dashboard');
     } catch (err: any) {
-      // Handled by store sync, but fallback just in case
       setError(err.message || 'Login failed');
     }
   };
@@ -63,6 +76,13 @@ export default function LoginPage() {
         {error && (
           <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-xs text-red-400 text-center font-medium">
             {error}
+          </div>
+        )}
+
+        {/* Wakeup warning for Render cold starts */}
+        {showWakeupNotice && (
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-xs text-amber-300 text-center font-medium animate-pulse">
+            Waking up server on Render free tier (takes ~45 seconds on first load)...
           </div>
         )}
 
@@ -102,20 +122,41 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={authLoading}
-            className="w-full bg-brand-600 hover:bg-brand-500 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-brand-500/15 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:active:scale-100"
-          >
-            {authLoading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Signing In...
-              </>
-            ) : (
-              'Sign In'
-            )}
-          </button>
+          <div className="space-y-2 pt-2">
+            <button
+              type="submit"
+              disabled={authLoading}
+              className="w-full bg-brand-600 hover:bg-brand-500 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-brand-500/15 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:active:scale-100"
+            >
+              {authLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Signing In...
+                </>
+              ) : (
+                'Sign In'
+              )}
+            </button>
+
+            <button
+              type="button"
+              disabled={authLoading}
+              onClick={async () => {
+                setEmail('demo@coach.com');
+                setPassword('demopass123');
+                setError(null);
+                try {
+                  await login('demo@coach.com', 'demopass123');
+                  router.push('/dashboard');
+                } catch (err: any) {
+                  setError(err.message || 'Demo login failed');
+                }
+              }}
+              className="w-full bg-white/5 border border-white/10 hover:bg-white/10 text-white font-semibold py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:active:scale-100"
+            >
+              Try Guest Demo
+            </button>
+          </div>
         </form>
 
         <div className="text-center text-xs text-dark-400 pt-2 border-t border-white/5">
