@@ -15,8 +15,8 @@ An AI-powered coaching platform that uses a team of specialized agents to teach 
 │  ┌─────────────┐  ┌──────────┐  ┌────────────────┐   │
 │  │  Auth (JWT) │  │ Sessions │  │  SSE Streaming │   │
 │  └─────────────┘  └──────────┘  └────────┬───────┘   │
-│                                           │          │
-│  ┌────────────────────────────────────────▼───────┐  │
+│                                          │           │
+│  ┌───────────────────────────────────────▼────────┐  │
 │  │            LangGraph Supervisor                │  │
 │  │  ┌──────────────────────────────────────────┐  │  │
 │  │  │  Problem   │ Teaching │ Algorithm │ Code │  │  │
