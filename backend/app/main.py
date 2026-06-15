@@ -15,6 +15,16 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Startup: Initialize DB tables
+    try:
+        from app.db.database import engine
+        from app.db.models import Base
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        print("Database tables initialized successfully.")
+    except Exception as e:
+        print(f"Failed to initialize database tables: {e}")
+
     # Startup: Initialize Qdrant collection
     try:
         qdrant = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
