@@ -6,27 +6,27 @@ An AI-powered coaching platform that uses a team of specialized agents to teach 
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│                    Frontend (Next.js)                  │
-│              Real-time SSE streaming UI                │
+│                    Frontend (Next.js)                │
+│              Real-time SSE streaming UI              │
 └────────────────────────┬─────────────────────────────┘
                          │ REST + SSE
 ┌────────────────────────▼─────────────────────────────┐
-│                  FastAPI Backend                       │
-│  ┌─────────────┐  ┌──────────┐  ┌────────────────┐  │
-│  │  Auth (JWT)  │  │ Sessions │  │  SSE Streaming │  │
-│  └─────────────┘  └──────────┘  └────────┬───────┘  │
+│                  FastAPI Backend                     │
+│  ┌─────────────┐  ┌──────────┐  ┌────────────────┐   │
+│  │  Auth (JWT) │  │ Sessions │  │  SSE Streaming │   │
+│  └─────────────┘  └──────────┘  └────────┬───────┘   │
 │                                           │          │
 │  ┌────────────────────────────────────────▼───────┐  │
-│  │            LangGraph Supervisor                 │  │
-│  │  ┌─────────────────────────────────────────┐   │  │
-│  │  │  Problem   │ Teaching │ Algorithm │ Code │   │  │
-│  │  │  Analyzer  │  Agent   │  Expert   │Review│   │  │
-│  │  ├─────────────────────────────────────────┤   │  │
-│  │  │ Complexity │  Test    │ Learning  │      │   │  │
-│  │  │ Analyzer   │  Cases   │  Memory   │      │   │  │
-│  │  └─────────────────────────────────────────┘   │  │
+│  │            LangGraph Supervisor                │  │
+│  │  ┌──────────────────────────────────────────┐  │  │
+│  │  │  Problem   │ Teaching │ Algorithm │ Code │  │  │
+│  │  │  Analyzer  │  Agent   │  Expert   │Review│  │  │
+│  │  ├──────────────────────────────────────────┤  │  │
+│  │  │ Complexity │  Test    │ Learning  │      │  │  │
+│  │  │ Analyzer   │  Cases   │  Memory   │      │  │  │
+│  │  └──────────────────────────────────────────┘  │  │
 │  └────────────────────────────────────────────────┘  │
-│                                                       │
+│                                                      │
 │  ┌────────────┐  ┌──────────┐  ┌──────────────────┐  │
 │  │ PostgreSQL │  │  Qdrant  │  │      Redis       │  │
 │  │  (state)   │  │ (vectors)│  │    (caching)     │  │
@@ -49,16 +49,16 @@ An AI-powered coaching platform that uses a team of specialized agents to teach 
 
 ## Agent System
 
-| Agent                | Role                                                        |
-| -------------------- | ----------------------------------------------------------- |
-| **Supervisor**       | Routes queries to the right specialist agent                |
-| **Problem Analyzer** | Parses problems, estimates difficulty, identifies categories|
-| **Teaching Agent**   | Core Socratic coach — guides with questions, not answers    |
-| **Algorithm Expert** | Explains algorithms, compares approaches pedagogically     |
-| **Complexity Analyzer** | Analyzes time/space complexity, validates student analysis|
-| **Test Case Generator**| Creates edge cases, explains why each matters             |
-| **Code Review**      | Reviews code WITHOUT rewriting — only explains issues       |
-| **Learning Memory**  | Tracks proficiency, identifies patterns and weaknesses      |
+| Agent                  | Role                                                          |
+|------------------------|---------------------------------------------------------------|
+| **Supervisor**         | Routes queries to the right specialist agent                  |
+| **Problem Analyzer**   | Parses problems, estimates difficulty, identifies categories  |
+| **Teaching Agent**     | Core Socratic coach — guides with questions, not answers      |
+| **Algorithm Expert**   | Explains algorithms, compares approaches pedagogically        |
+| **Complexity Analyzer**| Analyzes time/space complexity, validates student analysis    |
+| **Test Case Generator**| Creates edge cases, explains why each matters                 |
+| **Code Review**        | Reviews code WITHOUT rewriting — only explains issues         |
+| **Learning Memory**    | Tracks proficiency, identifies patterns and weaknesses        |
 
 ## Two Modes
 
