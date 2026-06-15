@@ -56,6 +56,11 @@ def get_qdrant_client() -> QdrantClient:
     """Return a QdrantClient instance."""
     from app.config import get_settings
     settings = get_settings()
+    if settings.qdrant_api_key:
+        return QdrantClient(
+            url=f"https://{settings.qdrant_host}" if not settings.qdrant_host.startswith("http") else settings.qdrant_host,
+            api_key=settings.qdrant_api_key,
+        )
     return QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
 
 

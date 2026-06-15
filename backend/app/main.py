@@ -27,7 +27,13 @@ async def lifespan(app: FastAPI):
 
     # Startup: Initialize Qdrant collection
     try:
-        qdrant = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
+        if settings.qdrant_api_key:
+            qdrant = QdrantClient(
+                url=f"https://{settings.qdrant_host}" if not settings.qdrant_host.startswith("http") else settings.qdrant_host,
+                api_key=settings.qdrant_api_key,
+            )
+        else:
+            qdrant = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
         init_collection(qdrant)
     except Exception as e:
         print(f"Failed to initialize Qdrant collection: {e}")
