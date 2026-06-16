@@ -9,6 +9,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.graph import get_compiled_graph
+from app.agents.utils import parse_and_strip_reasoning
 from app.db.models import User
 from app.dependencies import get_current_user, get_db
 from app.schemas.chat import ChatRequest, ChatResponse
@@ -18,45 +19,14 @@ from app.services import session_service
 
 def strip_reasoning_block(text: str) -> str:
     """Strip the <reasoning>...</reasoning> block from the text."""
-    return re.sub(r"<reasoning>.*?</reasoning>", "", text, flags=re.DOTALL).strip()
+    clean_text, _ = parse_and_strip_reasoning(text)
+    return clean_text
 
 
 def parse_reasoning_block(text: str) -> dict | None:
     """Parse reasoning block from text (either XML tags or JSON)."""
-    match = re.search(r"<reasoning>(.*?)</reasoning>", text, flags=re.DOTALL)
-    if not match:
-        return None
-    content = match.group(1).strip()
-    
-    # Try parsing as JSON first
-    try:
-        return json.loads(content)
-    except Exception:
-        pass
-        
-    # If not JSON, parse as XML-like tags
-    frame = {}
-    tags = [
-        "current_understanding",
-        "key_observation",
-        "why_it_matters",
-        "why_not_direct_answer",
-        "next_step_for_student",
-        "pedagogical_goal",
-    ]
-    for tag in tags:
-        tag_match = re.search(f"<{tag}>(.*?)</{tag}>", content, flags=re.DOTALL)
-        if tag_match:
-            frame[tag] = tag_match.group(1).strip()
-            
-    # Parse possible_approaches (which has multiple <approach> tags)
-    approaches_match = re.search(r"<possible_approaches>(.*?)</possible_approaches>", content, flags=re.DOTALL)
-    if approaches_match:
-        approaches_content = approaches_match.group(1)
-        approaches = re.findall(r"<approach>(.*?)</approach>", approaches_content, flags=re.DOTALL)
-        frame["possible_approaches"] = [a.strip() for a in approaches]
-        
-    return frame
+    _, frame = parse_and_strip_reasoning(text)
+    return frame if frame else None
 
 
 class StreamingFilter:
@@ -76,24 +46,30 @@ class StreamingFilter:
         self.buffer += chunk
 
         if not self.inside_reasoning:
-            if "<reasoning>" in self.buffer:
-                parts = self.buffer.split("<reasoning>", 1)
-                clean_before = parts[0]
+            lower_buf = self.buffer.lower()
+            if "<reasoning>" in lower_buf:
+                idx = lower_buf.index("<reasoning>")
+                clean_before = self.buffer[:idx]
+                
+                # Check if clean_before is just formatting/whitespaces/markdown wrappers
+                has_real_content = False
+                cleaned_candidate = re.sub(r"[ `\n\r\t]+", "", clean_before).lower()
+                if cleaned_candidate and cleaned_candidate != "xml" and cleaned_candidate != "```xml":
+                    has_real_content = True
+                
                 self.inside_reasoning = True
-                self.buffer = parts[1]
-                return clean_before, None
+                self.buffer = self.buffer[idx + len("<reasoning>"):]
+                return (clean_before if has_real_content else ""), None
             else:
-                prefix_candidate = "<reasoning>"
-                is_prefix = False
-                stripped_buf = self.buffer.lstrip()
-                if not stripped_buf:
-                    return "", None
-                for i in range(1, len(prefix_candidate) + 1):
-                    if prefix_candidate[:i].startswith(stripped_buf):
-                        is_prefix = True
+                # Potential prefix leading to <reasoning> (e.g. whitespace, backticks, xml)
+                normalized = re.sub(r"[ `\n\r\t]+", "", self.buffer).lower()
+                is_potential_prefix = False
+                for candidate in ["xml<reasoning>", "<reasoning>"]:
+                    if candidate.startswith(normalized):
+                        is_potential_prefix = True
                         break
                 
-                if is_prefix:
+                if is_potential_prefix and len(self.buffer) < 100:
                     return "", None
                 else:
                     released = self.buffer
@@ -102,27 +78,32 @@ class StreamingFilter:
                     return released, None
 
         if self.inside_reasoning:
-            if "</reasoning>" in self.buffer:
-                parts = self.buffer.split("</reasoning>", 1)
-                self.reasoning_content += parts[0]
+            lower_buf = self.buffer.lower()
+            if "</reasoning>" in lower_buf:
+                idx = lower_buf.index("</reasoning>")
+                self.reasoning_content += self.buffer[:idx]
                 self.inside_reasoning = False
                 self.done_reasoning = True
-                self.buffer = ""
+                
+                clean_reasoning = self.reasoning_content.strip()
+                clean_reasoning = re.sub(r"^```(?:json|xml)?\s*", "", clean_reasoning, flags=re.IGNORECASE)
+                clean_reasoning = re.sub(r"\s*```$", "", clean_reasoning).strip()
                 
                 reasoning_frame = {}
                 try:
-                    reasoning_frame = json.loads(self.reasoning_content.strip())
+                    reasoning_frame = json.loads(clean_reasoning)
                 except Exception as e:
                     print(f"StreamingFilter: failed to parse JSON reasoning content: {e}")
                     try:
-                        content_str = self.reasoning_content.strip()
-                        if "{" in content_str:
-                            json_str = content_str[content_str.index("{"):content_str.rindex("}") + 1]
+                        if "{" in clean_reasoning:
+                            json_str = clean_reasoning[clean_reasoning.index("{"):clean_reasoning.rindex("}") + 1]
                             reasoning_frame = json.loads(json_str)
                     except Exception:
                         pass
                 
-                clean_after = parts[1].lstrip()
+                clean_after = self.buffer[idx + len("</reasoning>"):]
+                clean_after = clean_after.lstrip()
+                self.buffer = ""
                 return clean_after, reasoning_frame
             else:
                 safe_len = len("</reasoning>")
@@ -146,13 +127,20 @@ class StreamingFilter:
         if self.inside_reasoning:
             self.inside_reasoning = False
             self.done_reasoning = True
+            
+            clean_reasoning = (self.reasoning_content + self.buffer).strip()
+            clean_reasoning = re.sub(r"^```(?:json|xml)?\s*", "", clean_reasoning, flags=re.IGNORECASE)
+            clean_reasoning = re.sub(r"\s*```$", "", clean_reasoning).strip()
+            
             try:
-                content_str = (self.reasoning_content + self.buffer).strip()
-                if "{" in content_str:
-                    json_str = content_str[content_str.index("{"):content_str.rindex("}") + 1]
-                    reasoning_frame = json.loads(json_str)
+                reasoning_frame = json.loads(clean_reasoning)
             except Exception:
-                pass
+                try:
+                    if "{" in clean_reasoning:
+                        json_str = clean_reasoning[clean_reasoning.index("{"):clean_reasoning.rindex("}") + 1]
+                        reasoning_frame = json.loads(json_str)
+                except Exception:
+                    pass
         else:
             released = self.buffer
             self.done_reasoning = True

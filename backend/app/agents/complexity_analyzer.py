@@ -7,6 +7,8 @@ from langchain_openai import ChatOpenAI
 
 from app.agents.prompts.complexity import COMPLEXITY_PROMPT
 from app.agents.state import CoachState
+from app.agents.utils import parse_and_strip_reasoning
+
 
 
 async def complexity_analyzer_node(state: CoachState) -> dict:
@@ -38,18 +40,7 @@ async def complexity_analyzer_node(state: CoachState) -> dict:
         print(f"Complexity analyzer invoke failed: {e}")
         content = "Let's analyze the time and space complexity of your approach together."
 
-    reasoning_frame = {}
-    clean_content = content
-
-    if "<reasoning>" in content and "</reasoning>" in content:
-        try:
-            start_idx = content.index("<reasoning>") + 11
-            end_idx = content.index("</reasoning>")
-            json_str = content[start_idx:end_idx].strip()
-            reasoning_frame = json.loads(json_str)
-            clean_content = content.split("</reasoning>", 1)[1].strip()
-        except Exception as e:
-            print(f"Failed to parse reasoning frame in complexity analyzer: {e}")
+    clean_content, reasoning_frame = parse_and_strip_reasoning(content)
 
     ai_msg = AIMessage(
         content=clean_content,
