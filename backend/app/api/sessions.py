@@ -198,8 +198,11 @@ async def create_coaching_session(
         
         # Save initial welcome message
         welcome_content = "Welcome to the session! Let's break this down Socratic style."
+        welcome_reasoning = None
         if messages:
-            welcome_content = messages[-1].content
+            raw_welcome = messages[-1].content
+            welcome_reasoning = parse_reasoning_block(raw_welcome)
+            welcome_content = strip_reasoning_block(raw_welcome)
             
         await session_service.save_message(
             db,
@@ -207,7 +210,10 @@ async def create_coaching_session(
             role="assistant",
             content=welcome_content,
             agent_name="ProblemAnalyzer",
-            metadata={"problem_analysis": analysis}
+            metadata={
+                "problem_analysis": analysis,
+                "reasoning_frame": welcome_reasoning
+            }
         )
         
         # Update session with problem analysis
@@ -486,11 +492,15 @@ async def submit_code(
         messages = state.get("messages", [])
         
         content = "I've reviewed your code. Let's look at it."
-        if messages:
-            content = messages[-1].content
-            
         reasoning = state.get("reasoning_frame", {})
         
+        if messages:
+            raw_content = messages[-1].content
+            parsed_reasoning = parse_reasoning_block(raw_content)
+            if parsed_reasoning:
+                reasoning = parsed_reasoning
+            content = strip_reasoning_block(raw_content)
+            
         # Save assistant message
         await session_service.save_message(
             db,
