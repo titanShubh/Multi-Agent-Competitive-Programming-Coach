@@ -1,14 +1,14 @@
 """Problem Analyzer agent node."""
 
 import json
-from typing import Any, Optional
+from typing import Optional
 
 from langchain_core.messages import AIMessage
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
 from app.agents.prompts.problem_analyzer import PROBLEM_ANALYZER_PROMPT
-from app.agents.state import CoachState, ProblemAnalysis
+from app.agents.state import CoachState
 from app.config import get_settings
 
 

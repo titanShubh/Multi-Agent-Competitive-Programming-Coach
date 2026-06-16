@@ -1,6 +1,7 @@
 """Coaching sessions API endpoints."""
 
 import json
+import re
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -10,9 +11,53 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.agents.graph import get_compiled_graph
 from app.db.models import User
 from app.dependencies import get_current_user, get_db
-from app.schemas.chat import ChatRequest, ChatResponse, StreamEvent
+from app.schemas.chat import ChatRequest, ChatResponse
 from app.schemas.session import SessionCreate, SessionListResponse, SessionResponse
 from app.services import session_service
+
+
+def strip_reasoning_block(text: str) -> str:
+    """Strip the <reasoning>...</reasoning> block from the text."""
+    return re.sub(r"<reasoning>.*?</reasoning>", "", text, flags=re.DOTALL).strip()
+
+
+def parse_reasoning_block(text: str) -> dict | None:
+    """Parse reasoning block from text (either XML tags or JSON)."""
+    match = re.search(r"<reasoning>(.*?)</reasoning>", text, flags=re.DOTALL)
+    if not match:
+        return None
+    content = match.group(1).strip()
+    
+    # Try parsing as JSON first
+    try:
+        return json.loads(content)
+    except Exception:
+        pass
+        
+    # If not JSON, parse as XML-like tags
+    frame = {}
+    tags = [
+        "current_understanding",
+        "key_observation",
+        "why_it_matters",
+        "why_not_direct_answer",
+        "next_step_for_student",
+        "pedagogical_goal",
+    ]
+    for tag in tags:
+        tag_match = re.search(f"<{tag}>(.*?)</{tag}>", content, flags=re.DOTALL)
+        if tag_match:
+            frame[tag] = tag_match.group(1).strip()
+            
+    # Parse possible_approaches (which has multiple <approach> tags)
+    approaches_match = re.search(r"<possible_approaches>(.*?)</possible_approaches>", content, flags=re.DOTALL)
+    if approaches_match:
+        approaches_content = approaches_match.group(1)
+        approaches = re.findall(r"<approach>(.*?)</approach>", approaches_content, flags=re.DOTALL)
+        frame["possible_approaches"] = [a.strip() for a in approaches]
+        
+    return frame
+
 
 class StreamingFilter:
     def __init__(self):

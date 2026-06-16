@@ -9,6 +9,7 @@ import { TopicRadar } from '@/components/dashboard/TopicRadar';
 import { ProgressChart } from '@/components/dashboard/ProgressChart';
 import { PlusCircle, Loader2, Play, BookOpen, Clock, Settings } from 'lucide-react';
 import Link from 'next/link';
+import { ProblemsBrowser } from '@/components/dashboard/ProblemsBrowser';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -244,6 +245,9 @@ export default function DashboardPage() {
           <TopicRadar proficiency={user.topic_proficiency || {}} />
           <ProgressChart rating={user.current_rating} />
         </div>
+
+        {/* Problems Browser */}
+        <ProblemsBrowser />
       </main>
     </div>
   );

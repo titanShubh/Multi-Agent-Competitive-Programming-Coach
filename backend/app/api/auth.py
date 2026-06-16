@@ -1,6 +1,5 @@
 """Authentication endpoints."""
 
-from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
