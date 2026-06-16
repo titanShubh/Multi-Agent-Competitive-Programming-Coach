@@ -459,3 +459,9 @@ async def root():
         "message": "Welcome to the Multi-Agent Competitive Programming Coach API.",
         "docs": "/docs"
     }
+
+
+@app.get("/health")
+async def root_health():
+    """Root-level health check for cron-job pingers and uptime monitors."""
+    return {"status": "healthy", "service": "cp-coach-api"}
