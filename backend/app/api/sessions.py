@@ -273,41 +273,54 @@ async def get_session_messages(
 
 async def ensure_graph_state_seeded(db, session, graph, config, current_user):
     """Seed the LangGraph checkpointer state from DB if it is empty (e.g. after server restart)."""
-    state = await graph.aget_state(config)
-    if not state.values:
-        db_messages = await session_service.get_messages(db, session.id)
-        
-        from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-        history = []
-        
-        # We seed the checkpointer state with all messages EXCEPT the last one
-        # because the last one is the active user message which will be passed in input_data
-        messages_to_seed = db_messages[:-1] if db_messages else []
-        
-        for m in messages_to_seed:
-            if m.role == "user":
-                history.append(HumanMessage(content=m.content))
-            elif m.role == "assistant":
-                additional_kwargs = {}
-                if m.message_metadata and "reasoning_frame" in m.message_metadata:
-                    additional_kwargs["reasoning_frame"] = m.message_metadata["reasoning_frame"]
-                history.append(AIMessage(content=m.content, additional_kwargs=additional_kwargs))
-            elif m.role == "system":
-                history.append(SystemMessage(content=m.content))
-        
-        await graph.aupdate_state(
-            config,
-            {
-                "problem_statement": session.problem_statement,
-                "session_mode": session.session_mode,
-                "hint_level": session.hint_level,
-                "max_hint_used": session.max_hint_used,
-                "problem_analysis": session.problem_analysis,
-                "session_id": str(session.id),
-                "user_id": str(current_user.id),
-                "messages": history,
-            }
-        )
+    try:
+        state = await graph.aget_state(config)
+        if not state.values:
+            db_messages = await session_service.get_messages(db, session.id)
+            
+            from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+            history = []
+            
+            # We seed the checkpointer state with all messages EXCEPT the last one
+            # because the last one is the active user message which will be passed in input_data
+            messages_to_seed = db_messages[:-1] if db_messages else []
+            
+            for m in messages_to_seed:
+                content = m.content or ""
+                if m.role == "user":
+                    history.append(HumanMessage(content=content))
+                elif m.role == "assistant":
+                    additional_kwargs = {}
+                    metadata = m.message_metadata
+                    if metadata:
+                        if isinstance(metadata, str):
+                            try:
+                                metadata = json.loads(metadata)
+                            except Exception:
+                                metadata = {}
+                        if isinstance(metadata, dict) and "reasoning_frame" in metadata:
+                            additional_kwargs["reasoning_frame"] = metadata["reasoning_frame"]
+                    history.append(AIMessage(content=content, additional_kwargs=additional_kwargs))
+                elif m.role == "system":
+                    history.append(SystemMessage(content=content))
+                else:
+                    history.append(HumanMessage(content=content))
+            
+            await graph.aupdate_state(
+                config,
+                {
+                    "problem_statement": session.problem_statement or "",
+                    "session_mode": session.session_mode or "learning",
+                    "hint_level": session.hint_level or 0,
+                    "max_hint_used": session.max_hint_used or 0,
+                    "problem_analysis": session.problem_analysis,
+                    "session_id": str(session.id),
+                    "user_id": str(current_user.id),
+                    "messages": history,
+                }
+            )
+    except Exception as e:
+        print(f"Error seeding graph state: {e}")
 
 
 @router.post("/{session_id}/chat/stream")
