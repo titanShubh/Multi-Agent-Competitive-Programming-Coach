@@ -463,5 +463,20 @@ async def root():
 
 @app.get("/health")
 async def root_health():
-    """Root-level health check for cron-job pingers and uptime monitors."""
-    return {"status": "healthy", "service": "cp-coach-api"}
+    """Root-level health check for cron-job pingers, database keep-alives, and uptime monitors."""
+    qdrant_status = "unknown"
+    try:
+        from app.dependencies import get_qdrant_client
+        client = get_qdrant_client()
+        # Ping Qdrant to reset the inactivity timer and prevent cluster suspension
+        client.get_collections()
+        qdrant_status = "healthy"
+    except Exception as e:
+        qdrant_status = f"unhealthy: {e}"
+        print(f"Healthcheck Qdrant ping failed: {e}")
+
+    return {
+        "status": "healthy",
+        "service": "cp-coach-api",
+        "qdrant_status": qdrant_status
+    }
