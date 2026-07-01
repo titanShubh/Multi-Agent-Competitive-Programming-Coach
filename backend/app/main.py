@@ -475,8 +475,20 @@ async def root_health():
         qdrant_status = f"unhealthy: {e}"
         print(f"Healthcheck Qdrant ping failed: {e}")
 
+    redis_status = "unknown"
+    try:
+        import redis
+        # Ping Redis to prevent database hibernation / archiving due to inactivity
+        r = redis.Redis.from_url(settings.redis_url, socket_timeout=2.0)
+        r.ping()
+        redis_status = "healthy"
+    except Exception as e:
+        redis_status = f"unhealthy: {e}"
+        print(f"Healthcheck Redis ping failed: {e}")
+
     return {
         "status": "healthy",
         "service": "cp-coach-api",
-        "qdrant_status": qdrant_status
+        "qdrant_status": qdrant_status,
+        "redis_status": redis_status
     }
